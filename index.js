@@ -4,11 +4,20 @@ import cors from "cors";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-
+import path from "path";
+//import { fileURLToPath } from "url";
 // Load environment variables FIRST
 dotenv.config();
 
 console.log("🔑 Checking Gemini API Key in server.js:", process.env.GEMINI_API_KEY ? "✅ Present" : "❌ Missing");
+console.log('📧 Email Config Check:', {
+  user: process.env.EMAIL_USER ? '✅ Set' : '❌ Missing',
+  password: process.env.EMAIL_PASSWORD ? '✅ Set' : '❌ Missing'
+});
+import { configureCloudinary } from "./utils/cloudinary.js";
+configureCloudinary();
+
+
 
 // THEN import routes
 import authRoutes from "./routes/auth.js";
@@ -17,6 +26,9 @@ import journalRoutes from "./routes/journals.js";
 import chatRoutes from "./routes/chat.js";
 import meditationRoutes from "./routes/meditation.js";
 import progressRoutes from "./routes/progress.js";
+import settingsRoutes from "./routes/settings.js";
+import { startWeeklyReports } from "./utils/weeklyReports.js";
+import profileRoutes from "./routes/profile.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,6 +50,9 @@ app.use(
   })
 );
 
+// Static files serve karne ke liye (uploads folder)
+  app.use('/uploads', express.static('uploads'));
+
 // Database Connection
 const connectDB = async () => {
   try {
@@ -56,6 +71,7 @@ const connectDB = async () => {
   }
 };
 
+
 // Start Server After DB Connect
 connectDB().then(() => {
   app.use("/api/auth", authRoutes);
@@ -64,6 +80,16 @@ connectDB().then(() => {
   app.use("/api/chat", chatRoutes);
   app.use("/api/meditation", meditationRoutes);
   app.use("/api/progress", progressRoutes);
+  app.use("/api/settings", settingsRoutes);
+
+  
+
+// Routes mein add karo
+  app.use("/api/profile", profileRoutes);
+
+    // Weekly reports scheduler start karo
+  startWeeklyReports();
+  console.log('✅ Weekly reports scheduler started');
 
   app.get("/api/health", (req, res) => {
     res.json({
@@ -72,6 +98,14 @@ connectDB().then(() => {
       environment: process.env.NODE_ENV,
       database: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
       geminiConfigured: !!process.env.GEMINI_API_KEY,
+    });
+  });
+
+    app.get('/api/uploads-check', (req, res) => {
+    res.json({
+      message: 'Uploads directory is accessible',
+      uploadsPath: path.join(__dirname, 'uploads'),
+      files: [] // You can list files here if needed
     });
   });
 
